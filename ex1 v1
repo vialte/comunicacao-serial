@@ -1,0 +1,91 @@
+#include "stm32g0xx.h"
+#include <stdio.h>
+#include <stdlib.h>
+int comando[2], n=0, x=0, acao=0;
+void config_serial(void){
+RCC->APBENR1 |= 0x20000;
+GPIOA->MODER |= 0xA0;
+GPIOA->AFR[0] = 0x01100;
+USART2->BRR = 1666; ///(16MHz/ 9600)
+USART2->CR1 = 0x0000002D;
+USART2->CR2 = 0;
+USART2->CR3 = 0;
+NVIC_SetPriority(USART2_LPUART2_IRQn, 0);
+NVIC_EnableIRQ(USART2_LPUART2_IRQn);
+}
+void USART2_LPUART2_IRQHandler(void) {
+if (USART2->ISR & 0x20) {
+comando[x] = USART2->RDR;
+x++;
+if (x==2){
+	n = comando[1] - '0';
+	acao = comando[0];
+	x=0;
+}
+}
+}
+void manda_serial(int a) {
+while (!((USART2->ISR) & 0x80)) {};
+USART2->TDR = a;
+}
+int _write(int file, char *str, int len) {
+   for (int i = 0; i < len; i++) {
+       manda_serial(*str++);  // Envia cada caractere da string
+   }
+   return len;
+}
+void ligar(int n){
+	switch (n){
+		case 1:
+	GPIOC -> ODR |= 0x1;
+	break;
+		case 2:
+			GPIOC -> ODR |= 0x2;
+			break;
+		case 3:
+			GPIOC -> ODR |= 0x4;
+			break;
+		case 4:
+			GPIOC -> ODR |= 0x8;
+					break;
+		}
+	manda_serial;
+}
+void desligar(int n){
+	switch (n){
+			case 1:
+		GPIOC -> ODR &= ~0x1;
+		break;
+			case 2:
+				GPIOC -> ODR &= ~0x2;
+				break;
+			case 3:
+				GPIOC -> ODR &= ~0x4;
+				break;
+			case 4:
+				GPIOC -> ODR &= ~0x8;
+						break;
+			}
+	manda_serial;
+}
+int main(){
+	RCC -> IOPENR = 0x3F;
+	//clock do usart2 (bit17)
+	GPIOC -> MODER = 0x55; //PC0 A PC3
+	GPIOA->MODER = 0x28000000;
+config_serial();
+while(1) {
+	if (x==0){
+if (acao=='L'){
+ligar(n);
+printf ("Led %i ligado!\n\r", n);
+acao=0;
+}
+	else if (acao=='D'){
+desligar(n);
+printf ("Led %i desligado!\n\r", n);
+acao=0;
+}
+	}
+}
+}
